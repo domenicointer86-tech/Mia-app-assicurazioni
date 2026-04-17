@@ -1,10 +1,10 @@
 import streamlit as st
 from datetime import datetime
-import os
 
 # --- CONFIGURAZIONE ---
 TUA_EMAIL = "domenicointer86@gmail.com" 
-LOGO_PATH = "logo.png" 
+# Link diretto al logo generato
+LOGO_URL = "https://raw.githubusercontent.com/googleusercontent/image_generation_content/main/logo.png"
 
 # Impostazioni della pagina
 st.set_page_config(page_title="Domenico Work - Consulenza", page_icon="🛡️")
@@ -25,21 +25,22 @@ st.markdown(f"""
         border: none;
         box-shadow: 0 4px 15px rgba(247, 148, 29, 0.3);
     }}
-    .stTextInput>div>div>input, .stSelectbox>div>div>select {{
-        border-radius: 10px;
+    .stButton>button:hover {{
+        background-color: #cc7a14;
+    }}
+    h1, h3 {{
+        text-align: center;
     }}
     </style>
     """, unsafe_allow_html=True)
 
 # --- VISUALIZZAZIONE LOGO ---
-if os.path.exists(LOGO_PATH):
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.image(LOGO_PATH, use_column_width=True)
-else:
-    st.title("🛡️ DOMENICO work")
+# Caricamento diretto tramite URL per evitare errori di file mancanti
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    st.image(LOGO_URL, use_column_width=True)
 
-st.markdown("<h3 style='text-align: center; color: #007777;'>Prenota la tua Consulenza</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color: #007777;'>Prenota la tua Consulenza</h3>", unsafe_allow_html=True)
 st.write("Compila il modulo qui sotto. Domenico riceverà la tua richiesta all'istante.")
 
 # --- FORM DI PRENOTAZIONE ---
@@ -76,6 +77,7 @@ if submit:
                 <input type="hidden" name="_captcha" value="false">
                 <input type="hidden" name="_subject" value="DOMENICO WORK: Nuova richiesta da {nome}">
                 <input type="hidden" name="_template" value="table">
+                <input type="hidden" name="_next" value="https://share.streamlit.io/">
             </form>
             <script>document.getElementById('email_form').submit();</script>
         """
