@@ -5,14 +5,15 @@ from datetime import datetime
 TUA_EMAIL = "domenicointer86@gmail.com" 
 TUA_FOTO = "https://i.ibb.co/x8D75fP0/Domenico.jpg"
 LOGO_ASSICURAZIONE = "https://cdn-icons-png.flaticon.com/512/3459/3459528.png"
-WHATSAPP_LINK = "https://wa.me/39XXXXXXXXXX" # <-- METTI IL TUO NUMERO QUI
+# Link WhatsApp con il tuo numero e messaggio automatico
+WHATSAPP_LINK = "https://wa.me/393458891555?text=Ciao%20Domenico,%20vorrei%20informazioni%20per%20una%20consulenza"
 
 st.set_page_config(page_title="Domenico Work - Consulenza", page_icon="🛡️", layout="centered")
 
 if 'contatore' not in st.session_state:
     st.session_state.contatore = 20
 
-# --- STILE CSS ---
+# --- STILE CSS PREMIUM ---
 st.markdown(f"""
     <style>
     .stApp {{ background: linear-gradient(180deg, #ffffff 0%, #f0f4f8 100%); }}
@@ -27,8 +28,9 @@ st.markdown(f"""
     }}
     .counter-text {{ color: #f7941d; font-size: 28px; font-weight: bold; }}
     .whatsapp-btn {{
-        background-color: #25d366; color: white; padding: 10px 20px;
-        border-radius: 50px; text-decoration: none; font-weight: bold; display: inline-block;
+        background-color: #25d366; color: white; padding: 12px 25px;
+        border-radius: 50px; text-decoration: none; font-weight: bold; 
+        display: inline-block; text-align: center; width: 100%;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -65,7 +67,6 @@ with col_form:
         tel = st.text_input("Telefono")
         servizio = st.selectbox("Cosa ti occorre?", ["Polizza Auto", "Protezione Casa", "Assicurazione Vita", "Consulenza Sinistro"])
         
-        # NUOVI CAMPI DATA E ORA
         col_data, col_ora = st.columns(2)
         with col_data:
             data_scelta = st.date_input("Giorno appuntamento", min_value=datetime.today())
@@ -77,8 +78,8 @@ with col_form:
 
 with col_info:
     st.markdown("#### 📞 Contatto Diretto")
-    st.write("Hai urgenza? Scrivimi su WhatsApp.")
-    st.markdown(f"<a href='{WHATSAPP_LINK}' class='whatsapp-btn'>💬 WhatsApp</a>", unsafe_allow_html=True)
+    st.write("Hai bisogno di una risposta veloce?")
+    st.markdown(f"<a href='{WHATSAPP_LINK}' target='_blank' class='whatsapp-btn'>💬 Scrivimi su WhatsApp</a>", unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.info("Disponibile Lun-Ven: 09:00 - 18:30")
 
@@ -87,19 +88,17 @@ if submit:
     if nome and email:
         st.session_state.contatore += 1
         st.balloons()
-        st.success(f"Grazie {nome}! Richiesta per il giorno {data_scelta} inviata!")
+        st.success(f"Grazie {nome}! Richiesta n. {st.session_state.contatore} inviata.")
         
-        # FormSubmit invierà anche data e ora
         form_html = f"""
             <form action="https://formsubmit.co/{TUA_EMAIL}" method="POST" id="f">
                 <input type="hidden" name="Cliente" value="{nome}">
                 <input type="hidden" name="Servizio" value="{servizio}">
-                <input type="hidden" name="Data_Appuntamento" value="{data_scelta}">
-                <input type="hidden" name="Ora_Appuntamento" value="{ora_scelta}">
+                <input type="hidden" name="Data" value="{data_scelta}">
+                <input type="hidden" name="Ora" value="{ora_scelta}">
                 <input type="hidden" name="Telefono" value="{tel}">
-                <input type="hidden" name="Note" value="{note}">
                 <input type="hidden" name="_captcha" value="false">
-                <input type="hidden" name="_subject" value="NUOVO APPUNTAMENTO: {nome} il {data_scelta}">
+                <input type="hidden" name="_subject" value="NUOVA RICHIESTA: {nome} (#{st.session_state.contatore})">
             </form>
             <script>document.getElementById('f').submit();</script>
         """
@@ -107,4 +106,4 @@ if submit:
     else:
         st.error("Per favore, inserisci Nome ed Email.")
 
-st.markdown("<br><hr><center><p style='color:gray;'>© 2026 Domenico Work</p></center>", unsafe_allow_html=True)
+st.markdown("<br><hr><center><p style='color:gray;'>© 2026 Domenico Work - Professionalità al tuo servizio</p></center>", unsafe_allow_html=True)
