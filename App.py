@@ -1,146 +1,75 @@
 import streamlit as st
-import pandas as pd
-import plotly.express as px
 from datetime import datetime
+from fpdf import FPDF
+import base64
 
-# --- CONFIGURAZIONE E SESSIONE ---
-st.set_page_config(page_title="DOMENICO ULTRA-PRO", layout="wide", page_icon="🏢")
-
-if 'init' not in st.session_state:
-    st.session_state.menu = {
-        "Cucina": {"Pizza": 8.0, "Pasta": 10.0, "Carne": 15.0},
-        "Bar": {"Caffè": 1.2, "Birra": 5.0, "Cocktail": 7.0}
-    }
-    st.session_state.magazzino = {"Birra": 50, "Caffè": 100, "Pasta": 20}
-    st.session_state.tavoli = {f"Tavolo {i}": [] for i in range(1, 16)}
-    st.session_state.vendite_storico = []
-    st.session_state.camerieri = ["Domenico", "Staff 1", "Staff 2"]
-    st.session_state.init = True
-
-# --- CSS LUXURY DARK ---
-st.markdown("""
-<style>
-    .stApp { background-color: #0e1117; color: white; }
-    .stButton>button { border-radius: 10px; height: 3em; font-weight: bold; }
-    .metric-card { background: #1c1f26; padding: 15px; border-radius: 10px; border-left: 5px solid #c5a059; }
-    .stTab { background-color: transparent !important; }
-</style>
-""", unsafe_allow_html=True)
-
-# --- SIDEBAR NAVIGAZIONE ---
-with st.sidebar:
-    st.title("🏢 BUSINESS PANEL")
-    scelta = st.radio("VAI A:", [
-        "💰 CASSA & TAVOLI", 
-        "📦 MAGAZZINO", 
-        "📊 STATISTICHE VENDITE", 
-        "⚙️ CONFIGURAZIONE MENU"
-    ])
-    st.divider()
-    user = st.selectbox("OPERATORE:", st.session_state.camerieri)
-
-# --- MODULO 1: CASSA & TAVOLI ---
-if scelta == "💰 CASSA & TAVOLI":
-    st.header(f"💰 Punto Vendita - Operatore: {user}")
+# --- FUNZIONE GENERAZIONE PDF PER STAMPANTE TERMICA ---
+def genera_pdf_scontrino(tavolo, ordini, totale):
+    pdf = FPDF(format=(58, 150)) # Formato standard carta termica 58mm
+    pdf.add_page()
+    pdf.set_font("Courier", "B", 12)
+    pdf.cell(0, 10, "DOMENICO RISTO-PRO", ln=True, align='C')
+    pdf.set_font("Courier", "", 9)
+    pdf.cell(0, 5, f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align='C')
+    pdf.cell(0, 5, f"Tavolo: {tavolo}", ln=True, align='C')
+    pdf.cell(0, 5, "-"*25, ln=True, align='C')
     
-    # Grid Tavoli Rapida
-    t_cols = st.columns(5)
-    for i, (t_nome, t_items) in enumerate(st.session_state.tavoli.items()):
-        color = "🔴" if t_items else "🟢"
-        if t_cols[i % 5].button(f"{color} {t_nome}", key=f"select_{t_nome}"):
-            st.session_state.tavolo_attivo = t_nome
+    for item in ordini:
+        pdf.cell(30, 5, f"{item['n'][:15]}")
+        pdf.cell(10, 5, f"{item['pr']:.2f}", align='R', ln=True)
+    
+    pdf.cell(0, 5, "-"*25, ln=True, align='C')
+    pdf.set_font("Courier", "B", 12)
+    pdf.cell(30, 10, "TOTALE")
+    pdf.cell(10, 10, f"Euro {totale:.2f}", align='R', ln=True)
+    pdf.set_font("Courier", "", 8)
+    pdf.cell(0, 10, "Grazie e a presto!", ln=True, align='C')
+    
+    return pdf.output(dest='S').encode('latin-1')
 
+# --- LOGICA APP ---
+if 'menu' not in st.session_state:
+    st.session_state.menu = {"Cucina": {"Pizza": 8.0, "Pasta": 10.0}, "Bar": {"Birra": 5.0, "Caffè": 1.2}}
+if 'tavoli' not in st.session_state:
+    st.session_state.tavoli = {f"Tavolo {i}": [] for i in range(1, 13)}
+
+st.set_page_config(page_title="Domenico Pro", layout="wide")
+st.title("🚀 Domenico Management & Print")
+
+t_sel = st.selectbox("Seleziona Tavolo:", list(st.session_state.tavoli.keys()))
+col_a, col_b = st.columns([2, 1])
+
+with col_a:
+    for cat, prodotti in st.session_state.menu.items():
+        st.write(f"**{cat}**")
+        p_cols = st.columns(3)
+        for j, (p, prezzo) in enumerate(prodotti.items()):
+            if p_cols[j % 3].button(f"{p}\n€{prezzo}", key=f"{t_sel}_{p}"):
+                st.session_state.tavoli[t_sel].append({"n": p, "pr": prezzo})
+                st.rerun()
+
+with col_b:
+    st.write(f"### 🧾 Conto {t_sel}")
+    conto = st.session_state.tavoli[t_sel]
+    tot = sum(item['pr'] for item in conto)
+    for item in conto:
+        st.write(f"- {item['n']}: €{item['pr']:.2f}")
     st.divider()
-
-    if 'tavolo_attivo' in st.session_state:
-        t_sel = st.session_state.tavolo_attivo
-        col_dx, col_sx = st.columns([2, 1])
+    st.write(f"**TOTALE: €{tot:.2f}**")
+    
+    if tot > 0:
+        # Genera il PDF dello scontrino
+        pdf_data = genera_pdf_scontrino(t_sel, conto, tot)
         
-        with col_dx:
-            st.subheader(f"🛒 Ordine {t_sel}")
-            tabs = st.tabs(list(st.session_state.menu.keys()))
-            for i, cat in enumerate(st.session_state.menu.keys()):
-                with tabs[i]:
-                    m_cols = st.columns(3)
-                    prodotti = st.session_state.menu[cat]
-                    for j, (p, prezzo) in enumerate(prodotti.items()):
-                        if m_cols[j % 3].button(f"{p}\n€{prezzo}", key=f"add_{p}_{t_sel}"):
-                            st.session_state.tavoli[t_sel].append({"p": p, "pr": prezzo, "ora": datetime.now().strftime("%H:%M")})
-                            # Scarico magazzino automatico se esiste il prodotto
-                            if p in st.session_state.magazzino:
-                                st.session_state.magazzino[p] -= 1
-                            st.rerun()
-
-        with col_sx:
-            st.subheader("🧾 Scontrino")
-            ordine = st.session_state.tavoli[t_sel]
-            totale = sum(item['pr'] for item in ordine)
-            for item in ordine:
-                st.write(f"{item['p']} - €{item['pr']}")
-            st.markdown(f"## TOTALE: €{totale:.2f}")
-            
-            if st.button("✅ CHIUDI E INCASSA", type="primary"):
-                if ordine:
-                    st.session_state.vendite_storico.append({
-                        "Data": datetime.now().strftime("%Y-%m-%d"),
-                        "Ora": datetime.now().strftime("%H:%M"),
-                        "Tavolo": t_sel,
-                        "Totale": totale,
-                        "Cameriere": user
-                    })
-                    st.session_state.tavoli[t_sel] = []
-                    st.balloons()
-                    st.rerun()
-
-# --- MODULO 2: MAGAZZINO ---
-elif scelta == "📦 MAGAZZINO":
-    st.header("📦 Gestione Scorte")
-    col_m1, col_m2 = st.columns(2)
-    with col_m1:
-        st.subheader("Stato Attuale")
-        for prod, qta in st.session_state.magazzino.items():
-            colore_qta = "orange" if qta < 10 else "white"
-            st.markdown(f"**{prod}**: <span style='color:{colore_qta};'>{qta} unità</span>", unsafe_allow_html=True)
-    with col_m2:
-        st.subheader("Carico Merci")
-        p_carico = st.selectbox("Prodotto", list(st.session_state.magazzino.keys()))
-        q_carico = st.number_input("Quantità da aggiungere", min_value=1)
-        if st.button("AGGIORNA SCORTE"):
-            st.session_state.magazzino[p_carico] += q_carico
-            st.success("Magazzino aggiornato!")
-            st.rerun()
-
-# --- MODULO 3: STATISTICHE ---
-elif scelta == "📊 STATISTICHE VENDITE":
-    st.header("📊 Analisi Aziendale")
-    if st.session_state.vendite_storico:
-        df = pd.DataFrame(st.session_state.vendite_storico)
+        st.download_button(
+            label="🖨️ STAMPA SCONTRINO",
+            data=pdf_data,
+            file_name=f"scontrino_{t_sel}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
         
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Incasso Lordo", f"€ {df['Totale'].sum():.2f}")
-        c2.metric("Ordini Chiusi", len(df))
-        c3.metric("Media Scontrino", f"€ {df['Totale'].mean():.2f}")
-        
-        st.subheader("Andamento Vendite")
-        fig = px.line(df, x="Ora", y="Totale", title="Vendite per Orario", markers=True)
-        st.plotly_chart(fig, use_container_width=True)
-        
-        st.subheader("Performance Staff")
-        fig2 = px.bar(df, x="Cameriere", y="Totale", color="Cameriere", title="Incasso per Operatore")
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.info("Ancora nessuna vendita registrata oggi.")
-
-# --- MODULO 4: CONFIGURAZIONE ---
-elif scelta == "⚙️ CONFIGURAZIONE MENU":
-    st.header("⚙️ Configurazione Sistema")
-    with st.expander("Modifica Menu"):
-        c1, c2, c3 = st.columns(3)
-        nuova_cat = c1.selectbox("Categoria", list(st.session_state.menu.keys()))
-        nuovo_p = c2.text_input("Nome Piatto")
-        nuovo_pr = c3.number_input("Prezzo €", min_value=0.0)
-        if st.button("AGGIUNGI AL LISTINO"):
-            st.session_state.menu[nuova_cat][nuovo_p] = nuovo_pr
-            # Inizializza anche nel magazzino
-            st.session_state.magazzino[nuovo_p] = 0
+        if st.button("PAGA E CHIUDI", type="primary", use_container_width=True):
+            st.session_state.tavoli[t_sel] = []
+            st.success("Tavolo liberato!")
             st.rerun()
