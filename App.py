@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import datetime
 
 # Sostituisci questa email con la tua email professionale
-TUA_EMAIL = "tuaemail@esempio.it" 
+TUA_EMAIL = "domenicointer86@gmail.com"
 
 st.set_page_config(page_title="Prenota Consulenza", page_icon="🛡️")
 
