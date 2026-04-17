@@ -4,110 +4,60 @@ from datetime import datetime
 # --- CONFIGURAZIONE ---
 TUA_EMAIL = "domenicointer86@gmail.com" 
 LOGO_URL = "https://cdn-icons-png.flaticon.com/512/3459/3459528.png"
+# Link corretto per la tua foto
+FOTO_URL = "https://i.ibb.co/x8D75fP0/Domenico.jpg"
 
-# --- LA TUA FOTO DA IMGBB ---
-FOTO_URL = "https://i.ibb.co/x8D75fP0/your-image.jpg" # Link diretto ottimizzato
+st.set_page_config(page_title="Domenico Work", page_icon="🛡️")
 
-# Impostazioni della pagina
-st.set_page_config(page_title="Domenico Work - Consulenza", page_icon="🛡️")
-
-# --- GESTIONE CONTATORE ---
-if 'numero_clienti' not in st.session_state:
-    st.session_state.numero_clienti = 20
+if 'contatore' not in st.session_state:
+    st.session_state.contatore = 20
 
 # --- STILE CSS ---
-st.markdown(f"""
+st.markdown("""
     <style>
-    .stApp {{ background-color: #f8f9fa; }}
-    .stButton>button {{
-        width: 100%;
-        border-radius: 20px;
-        background-color: #004a99;
-        color: white;
-        font-weight: bold;
-        height: 3.5em;
-        border: none;
-    }}
-    .counter-box {{
-        background-color: white;
-        padding: 10px;
-        border-radius: 12px;
-        border: 2px solid #f7941d;
-        text-align: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }}
-    .counter-number {{
-        font-size: 24px;
-        font-weight: bold;
-        color: #f7941d;
-    }}
-    .profile-pic {{
-        border-radius: 50%;
-        border: 3px solid #004a99;
-        object-fit: cover;
-    }}
+    .stApp { background-color: #f8f9fa; }
+    .stButton>button { width: 100%; border-radius: 20px; background-color: #004a99; color: white; font-weight: bold; }
+    .counter-box { background-color: white; padding: 10px; border-radius: 12px; border: 2px solid #f7941d; text-align: center; }
+    .counter-number { font-size: 24px; font-weight: bold; color: #f7941d; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER: Foto | Logo | Contatore ---
+# --- HEADER ---
 col1, col2, col3 = st.columns([1, 1, 1])
-
 with col1:
-    # Mostriamo la tua foto vera
     st.image(FOTO_URL, width=100)
-    st.markdown("<p style='text-align:center; font-weight:bold; color:#004a99; margin-top:-5px;'>Domenico</p>", unsafe_allow_html=True)
-
+    st.write("**Domenico**")
 with col2:
-    st.image(LOGO_URL, width=75)
-    st.markdown("<p style='text-align:center; font-size:10px; font-weight:bold; color:#004a99;'>DOMENICO WORK</p>", unsafe_allow_html=True)
-
+    st.image(LOGO_URL, width=70)
 with col3:
-    st.markdown(f"""
-        <div class='counter-box'>
-            <div style='font-size: 10px; color: #666; font-weight:bold;'>CLIENTI SERVITI</div>
-            <div class='counter-number'>{st.session_state.numero_clienti}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown(f"<div class='counter-box'><div style='font-size:10px;'>CLIENTI</div><div class='counter-number'>{st.session_state.contatore}</div></div>", unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown("<h2 style='text-align:center; color:#004a99;'>Prenota il tuo Appuntamento</h2>", unsafe_allow_html=True)
 
-# --- FORM DI REGISTRAZIONE ---
-with st.form("modulo_prenotazione"):
+# --- FORM ---
+with st.form("my_form"):
     nome = st.text_input("Nome e Cognome*")
-    email = st.text_input("Tua Email*")
-    tel = st.text_input("Telefono / WhatsApp")
-    servizio = st.selectbox("Di cosa hai bisogno?", ["Polizza Auto", "Casa e Famiglia", "Vita e Risparmio", "Infortuni", "Altro"])
-    data_app = st.date_input("Giorno preferito", min_value=datetime.today())
-    
-    invio = st.form_submit_button("CONFERMA REGISTRAZIONE")
+    email = st.text_input("Email*")
+    tel = st.text_input("Telefono")
+    servizio = st.selectbox("Servizio", ["Auto", "Casa", "Vita", "Altro"])
+    submit = st.form_submit_button("CONFERMA")
 
-if invio:
+if submit:
     if nome and email:
-        # Aumentiamo il numero
-        st.session_state.numero_clienti += 1
-        st.success(f"Grazie {nome}! Richiesta inviata. Sei il cliente n. {st.session_state.numero_clienti}!")
+        st.session_state.contatore += 1
         st.balloons()
+        st.success(f"Inviato! Sei il cliente n. {st.session_state.contatore}")
         
-        # Invio Email tramite FormSubmit
-        html_email = f"""
-            <form action="https://formsubmit.co/{TUA_EMAIL}" method="POST" id="hidden_form">
-                <input type="hidden" name="N_CLIENTE" value="{st.session_state.numero_clienti}">
-                <input type="hidden" name="NOME" value="{nome}">
-                <input type="hidden" name="EMAIL" value="{email}">
-                <input type="hidden" name="TELEFONO" value="{tel}">
-                <input type="hidden" name="SERVIZIO" value="{servizio}">
+        # Sistema di invio mail semplificato
+        form_html = f"""
+            <form action="https://formsubmit.co/{TUA_EMAIL}" method="POST" id="email_f">
+                <input type="hidden" name="Nome" value="{nome}">
+                <input type="hidden" name="Email" value="{email}">
+                <input type="hidden" name="Servizio" value="{servizio}">
                 <input type="hidden" name="_captcha" value="false">
-                <input type="hidden" name="_subject" value="DOMENICO WORK: Nuova Prenotazione #{st.session_state.numero_clienti}">
             </form>
-            <script>document.getElementById('hidden_form').submit();</script>
+            <script>document.getElementById('email_f').submit();</script>
         """
-        st.components.v1.html(html_email, height=0)
-        
-        # Ricarica per aggiornare il contatore visibile
-        st.rerun()
+        st.components.v1.html(form_html, height=0)
     else:
-        st.error("Inserisci Nome ed Email per continuare.")
-
-st.markdown("---")
-st.caption("© 2026 Domenico Work - Consulenza Assicurativa Professionale")
+        st.error("Mancano Nome o Email!")
