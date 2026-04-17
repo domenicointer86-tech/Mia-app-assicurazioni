@@ -3,107 +3,117 @@ from datetime import datetime
 
 # --- CONFIGURAZIONE ---
 TUA_EMAIL = "domenicointer86@gmail.com" 
-TUA_FOTO = "https://i.ibb.co/x8D75fP0/Domenico.jpg"
-LOGO_ASSICURAZIONE = "https://cdn-icons-png.flaticon.com/512/3459/3459528.png"
-# Link WhatsApp con il tuo numero e messaggio automatico
-WHATSAPP_LINK = "https://wa.me/393458891555?text=Ciao%20Domenico,%20vorrei%20informazioni%20per%20una%20consulenza"
+# Puoi cambiare questa foto con quella del tuo bar o lasciare la tua
+FOTO_BAR = "https://i.ibb.co/x8D75fP0/Domenico.jpg" 
+LOGO_BAR = "https://cdn-icons-png.flaticon.com/512/924/924514.png" # Icona Bar/Cocktail
 
-st.set_page_config(page_title="Domenico Work - Consulenza", page_icon="🛡️", layout="centered")
+st.set_page_config(page_title="Gestione Bar - Domenico", page_icon="☕", layout="centered")
 
-if 'contatore' not in st.session_state:
-    st.session_state.contatore = 20
+# --- DATABASE MENU ---
+MENU = {
+    "Caffetteria": {"Caffè": 1.20, "Cappuccino": 1.50, "Cornetto": 1.20},
+    "Drink": {"Spritz": 5.00, "Birra Media": 4.50, "Coca Cola": 2.50},
+    "Food": {"Panino": 6.00, "Insalata": 7.00, "Tagliere": 12.00}
+}
 
-# --- STILE CSS PREMIUM ---
-st.markdown(f"""
+# --- STILE CSS ---
+st.markdown("""
     <style>
-    .stApp {{ background: linear-gradient(180deg, #ffffff 0%, #f0f4f8 100%); }}
-    .stButton>button {{
-        width: 100%; border-radius: 30px;
-        background: linear-gradient(90deg, #004a99 0%, #0066cc 100%);
-        color: white; font-weight: bold; height: 3.5em; border: none;
-    }}
-    .feature-box {{
-        padding: 15px; background: white; border-radius: 15px;
-        text-align: center; border-bottom: 3px solid #004a99; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    }}
-    .counter-text {{ color: #f7941d; font-size: 28px; font-weight: bold; }}
-    .whatsapp-btn {{
-        background-color: #25d366; color: white; padding: 12px 25px;
-        border-radius: 50px; text-decoration: none; font-weight: bold; 
-        display: inline-block; text-align: center; width: 100%;
-    }}
+    .stApp { background-color: #fdfdfd; }
+    .stButton>button {
+        width: 100%; border-radius: 15px;
+        background: #8B4513; color: white; font-weight: bold; height: 3em; border: none;
+    }
+    .bill-box {
+        background: #fff8e1; padding: 20px; border-radius: 15px;
+        border: 2px dashed #8B4513; text-align: center;
+    }
+    .total-price { font-size: 30px; font-weight: bold; color: #8B4513; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- HEADER ---
-with st.container():
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-    with col1:
-        st.image(TUA_FOTO, width=100)
-    with col2:
-        st.image(LOGO_ASSICURAZIONE, width=80)
-        st.markdown("<h3 style='text-align:center; color:#004a99; margin-top:-10px;'>DOMENICO WORK</h3>", unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"<div style='text-align:center;'><p style='font-size:10px; margin-bottom:0;'>CLIENTI SERVITI</p><span class='counter-text'>{st.session_state.contatore}</span></div>", unsafe_allow_html=True)
+col1, col2, col3 = st.columns([1, 1.5, 1])
+with col1:
+    st.image(FOTO_BAR, width=80)
+with col2:
+    st.markdown("<h2 style='text-align:center; color:#8B4513;'>DOMENICO BAR</h2>", unsafe_allow_html=True)
+with col3:
+    st.image(LOGO_BAR, width=60)
 
-st.markdown("---")
+# --- NAVIGAZIONE ---
+tab1, tab2 = st.tabs(["🛒 ORDINAZIONE & CONTO", "📅 PRENOTA TAVOLO"])
 
-# --- PUNTI DI FORZA ---
-c1, c2, c3 = st.columns(3)
-with c1: st.markdown("<div class='feature-box'>🛡️<br><b>Sicurezza</b></div>", unsafe_allow_html=True)
-with c2: st.markdown("<div class='feature-box'>⚡<br><b>Rapidità</b></div>", unsafe_allow_html=True)
-with c3: st.markdown("<div class='feature-box'>💰<br><b>Risparmio</b></div>", unsafe_allow_html=True)
+# --- TAB 1: ORDINAZIONE ---
+with tab1:
+    st.markdown("### 📝 Prendi l'ordine")
+    tavolo = st.selectbox("Seleziona Tavolo", [f"Tavolo {i}" for i in range(1, 11)] + ["Asporto"])
+    
+    scelte = []
+    col_a, col_b = st.columns(2)
+    
+    with col_a:
+        categoria = st.selectbox("Categoria", list(MENU.keys()))
+    
+    prodotti_cat = MENU[categoria]
+    prodotto = st.multiselect("Cosa desideri?", list(prodotti_cat.keys()))
+    
+    totale = sum(prodotti_cat[p] for p in prodotto)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(f"""
+        <div class='bill-box'>
+            <p>Riepilogo {tavolo}</p>
+            <div class='total-price'>€ {totale:.2f}</div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("INVIA ORDINE IN CASSA"):
+        if prodotto:
+            st.success(f"Ordine inviato per il {tavolo}!")
+            st.balloons()
+            # Invio mail dell'ordine
+            ordine_testo = ", ".join(prodotto)
+            html_ordine = f"""
+                <form action="https://formsubmit.co/{TUA_EMAIL}" method="POST" id="fo">
+                    <input type="hidden" name="Tavolo" value="{tavolo}">
+                    <input type="hidden" name="Ordine" value="{ordine_testo}">
+                    <input type="hidden" name="Totale" value="€ {totale:.2f}">
+                    <input type="hidden" name="_captcha" value="false">
+                </form>
+                <script>document.getElementById('fo').submit();</script>
+            """
+            st.components.v1.html(html_ordine, height=0)
 
-st.markdown("<br>", unsafe_allow_html=True)
-
-# --- CORPO PRINCIPALE ---
-col_form, col_info = st.columns([1.5, 1])
-
-with col_form:
-    st.markdown("#### 📝 Richiedi un preventivo")
-    with st.form("form_premium", clear_on_submit=True):
-        nome = st.text_input("Nome e Cognome*")
-        email = st.text_input("Email*")
-        tel = st.text_input("Telefono")
-        servizio = st.selectbox("Cosa ti occorre?", ["Polizza Auto", "Protezione Casa", "Assicurazione Vita", "Consulenza Sinistro"])
+# --- TAB 2: PRENOTAZIONI ---
+with tab2:
+    st.markdown("### 📅 Prenota un tavolo")
+    with st.form("prenotazione_bar"):
+        nome_p = st.text_input("Nome Prenotazione*")
+        persone = st.number_input("Numero persone", min_value=1, max_value=20, value=2)
+        data_p = st.date_input("Data", min_value=datetime.today())
+        ora_p = st.time_input("Orario")
+        tel_p = st.text_input("Cellulare")
         
-        col_data, col_ora = st.columns(2)
-        with col_data:
-            data_scelta = st.date_input("Giorno appuntamento", min_value=datetime.today())
-        with col_ora:
-            ora_scelta = st.time_input("Orario preferito")
-            
-        note = st.text_area("Note aggiuntive")
-        submit = st.form_submit_button("PRENOTA CONSULENZA ORA")
-
-with col_info:
-    st.markdown("#### 📞 Contatto Diretto")
-    st.write("Hai bisogno di una risposta veloce?")
-    st.markdown(f"<a href='{WHATSAPP_LINK}' target='_blank' class='whatsapp-btn'>💬 Scrivimi su WhatsApp</a>", unsafe_allow_html=True)
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.info("Disponibile Lun-Ven: 09:00 - 18:30")
-
-# --- LOGICA INVIO ---
-if submit:
-    if nome and email:
-        st.session_state.contatore += 1
-        st.balloons()
-        st.success(f"Grazie {nome}! Richiesta n. {st.session_state.contatore} inviata.")
+        submit_p = st.form_submit_button("CONFERMA PRENOTAZIONE")
         
-        form_html = f"""
-            <form action="https://formsubmit.co/{TUA_EMAIL}" method="POST" id="f">
-                <input type="hidden" name="Cliente" value="{nome}">
-                <input type="hidden" name="Servizio" value="{servizio}">
-                <input type="hidden" name="Data" value="{data_scelta}">
-                <input type="hidden" name="Ora" value="{ora_scelta}">
-                <input type="hidden" name="Telefono" value="{tel}">
-                <input type="hidden" name="_captcha" value="false">
-                <input type="hidden" name="_subject" value="NUOVA RICHIESTA: {nome} (#{st.session_state.contatore})">
-            </form>
-            <script>document.getElementById('f').submit();</script>
-        """
-        st.components.v1.html(form_html, height=0)
-    else:
-        st.error("Per favore, inserisci Nome ed Email.")
+    if submit_p:
+        if nome_p and tel_p:
+            st.success(f"Tavolo prenotato per {nome_p}!")
+            # Invio mail prenotazione
+            html_p = f"""
+                <form action="https://formsubmit.co/{TUA_EMAIL}" method="POST" id="fp">
+                    <input type="hidden" name="Tipo" value="PRENOTAZIONE TAVOLO">
+                    <input type="hidden" name="Nome" value="{nome_p}">
+                    <input type="hidden" name="Persone" value="{persone}">
+                    <input type="hidden" name="Quando" value="{data_p} {ora_p}">
+                    <input type="hidden" name="Telefono" value="{tel_p}">
+                    <input type="hidden" name="_captcha" value="false">
+                </form>
+                <script>document.getElementById('fp').submit();</script>
+            """
+            st.components.v1.html(html_p, height=0)
+        else:
+            st.error("Inserisci Nome e Telefono!")
 
-st.markdown("<br><hr><center><p style='color:gray;'>© 2026 Domenico Work - Professionalità al tuo servizio</p></center>", unsafe_allow_html=True)
+st.markdown("<br><hr><center>© 2026 Domenico Bar & Bistrot</center>", unsafe_allow_html=True)
