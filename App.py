@@ -3,8 +3,9 @@ from datetime import datetime
 
 # --- CONFIGURAZIONE ---
 TUA_EMAIL = "domenicointer86@gmail.com" 
-# Link diretto al logo generato
-LOGO_URL = "https://raw.githubusercontent.com/googleusercontent/image_generation_content/main/logo.png"
+
+# Icona professionale garantita (Scudo Protezione)
+LOGO_URL = "https://cdn-icons-png.flaticon.com/512/3459/3459528.png"
 
 # Impostazioni della pagina
 st.set_page_config(page_title="Domenico Work - Consulenza", page_icon="🛡️")
@@ -13,35 +14,40 @@ st.set_page_config(page_title="Domenico Work - Consulenza", page_icon="🛡️")
 st.markdown(f"""
     <style>
     .stApp {{
-        background-color: #f0f7f7;
+        background-color: #f4f7f9;
     }}
     .stButton>button {{
         width: 100%;
         border-radius: 25px;
         height: 3.5em;
-        background-color: #f7941d; /* Arancio Domenico Work */
+        background-color: #004a99; /* Blu professionale */
         color: white;
         font-weight: bold;
         border: none;
-        box-shadow: 0 4px 15px rgba(247, 148, 29, 0.3);
-    }}
-    .stButton>button:hover {{
-        background-color: #cc7a14;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }}
     h1, h3 {{
         text-align: center;
+        color: #004a99;
+    }}
+    .logo-text {{
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        color: #004a99;
+        margin-bottom: 20px;
     }}
     </style>
     """, unsafe_allow_html=True)
 
 # --- VISUALIZZAZIONE LOGO ---
-# Caricamento diretto tramite URL per evitare errori di file mancanti
-col1, col2, col3 = st.columns([1, 2, 1])
+col1, col2, col3 = st.columns([1, 1, 1])
 with col2:
-    st.image(LOGO_URL, use_column_width=True)
+    st.image(LOGO_URL, width=120)
 
-st.markdown("<h3 style='color: #007777;'>Prenota la tua Consulenza</h3>", unsafe_allow_html=True)
-st.write("Compila il modulo qui sotto. Domenico riceverà la tua richiesta all'istante.")
+st.markdown("<div class='logo-text'>DOMENICO WORK</div>", unsafe_allow_html=True)
+st.markdown("<h3>Prenota la tua Consulenza</h3>", unsafe_allow_html=True)
+st.write("Compila il modulo qui sotto e verrai ricontattato da Domenico.")
 
 # --- FORM DI PRENOTAZIONE ---
 with st.form("modulo_domenico", clear_on_submit=True):
@@ -62,7 +68,7 @@ with st.form("modulo_domenico", clear_on_submit=True):
 # --- LOGICA DI INVIO ---
 if submit:
     if nome and email_cliente:
-        st.success(f"Ottimo {nome}! Richiesta inviata. Domenico ti ricontatterà a breve.")
+        st.success(f"Grazie {nome}! Richiesta inviata con successo.")
         st.balloons()
         
         # Invio Email tramite FormSubmit
@@ -77,13 +83,12 @@ if submit:
                 <input type="hidden" name="_captcha" value="false">
                 <input type="hidden" name="_subject" value="DOMENICO WORK: Nuova richiesta da {nome}">
                 <input type="hidden" name="_template" value="table">
-                <input type="hidden" name="_next" value="https://share.streamlit.io/">
             </form>
             <script>document.getElementById('email_form').submit();</script>
         """
         st.components.v1.html(html_code, height=0)
     else:
-        st.error("Ops! Inserisci nome ed email per poter essere ricontattato.")
+        st.error("Inserisci nome ed email per procedere.")
 
 st.markdown("---")
-st.caption("© 2026 Domenico Work - Consulenza Assicurativa Professionale")
+st.caption("© 2024 Domenico Work - Consulenza Assicurativa Professionale")
