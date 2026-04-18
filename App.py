@@ -1,55 +1,54 @@
 import streamlit as st
+import pandas as pd
+import sqlite3
+from datetime import datetime
+import plotly.express as px
 
-# --- Configurazione Pagina ---
-st.set_page_config(page_title="Gestionale Ristorante Pro", layout="wide")
-st.title("🍴 Gestionale Ristorante Professionale")
+# --- Database Setup ---
+conn = sqlite3.connect('ristorante_pro.db', check_same_thread=False)
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS vendite 
+             (id INTEGER PRIMARY KEY AUTOINCREMENT, piatto TEXT, prezzo REAL, data TEXT)''')
+conn.commit()
 
-# --- Inizializzazione Dati (Stato della Sessione) ---
-# In Streamlit, dobbiamo usare st.session_state per non perdere i dati al ricaricamento
-if 'ordini' not in st.session_state:
-    st.session_state.ordini = {f"Tavolo {i}": [] for i in range(1, 7)}
+# --- Funzioni Business ---
+def salva_vendita(piatti):
+    data_ora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for p in piatti:
+        c.execute("INSERT INTO vendite (piatto, prezzo, data) VALUES (?, ?, ?)", 
+                  (p['piatto'], p['prezzo'], data_ora))
+    conn.commit()
 
-menu = {
-    "Pasta al Forno": 10.0,
-    "Bistecca": 15.0,
-    "Insalata": 7.0,
-    "Acqua": 2.0,
-    "Caffè": 1.5
-}
+# --- Interfaccia Streamlit ---
+st.set_page_config(page_title="Gestione Ristorante 2.0", layout="wide")
 
-# --- Sidebar per Ordinazioni ---
-st.sidebar.header("Prendi Ordine")
-tavolo_selezionato = st.sidebar.selectbox("Seleziona Tavolo", list(st.session_state.ordini.keys()))
-piatto_selezionato = st.sidebar.selectbox("Seleziona Piatto", list(menu.keys()))
+tab1, tab2 = st.tabs(["🛒 Gestione Sala", "📊 Analisi Vendite"])
 
-if st.sidebar.button("Aggiungi all'ordine"):
-    st.session_state.ordini[tavolo_selezionato].append({
-        "piatto": piatto_selezionato,
-        "prezzo": menu[piatto_selezionato]
-    })
-    st.sidebar.success(f"Aggiunto {piatto_selezionato} al {tavolo_selezionato}")
+with tab1:
+    # (Qui tieni la logica dei tavoli che abbiamo scritto prima)
+    # Ma quando clicchi su "Paga e Libera Tavolo", aggiungi:
+    # salva_vendita(st.session_state.ordini[tavolo_conto])
+    st.info("Gestisci i tavoli e salva gli ordini nel database locale.")
 
-# --- Dashboard Principale ---
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Stato Tavoli")
-    for tavolo, piatti in st.session_state.ordini.items():
-        stato = "🔴 Occupato" if piatti else "🟢 Libero"
-        st.write(f"**{tavolo}**: {stato} ({len(piatti)} piatti ordinati)")
-
-with col2:
-    st.subheader("Conto e Chiusura")
-    tavolo_conto = st.selectbox("Seleziona Tavolo per il conto", list(st.session_state.ordini.keys()))
+with tab2:
+    st.header("Statistiche Professionali")
+    df = pd.read_sql_query("SELECT * FROM vendite", conn)
     
-    if st.session_state.ordini[tavolo_conto]:
-        totale = sum(item['prezzo'] for item in st.session_state.ordini[tavolo_conto])
-        st.table(st.session_state.ordini[tavolo_conto])
-        st.write(f"### TOTALE: {totale}€")
+    if not df.empty:
+        col_a, col_b = st.columns(2)
         
-        if st.button("Paga e Libera Tavolo"):
-            st.session_state.ordini[tavolo_conto] = []
-            st.success("Tavolo liberato correttamente!")
-            st.rerun() # Ricarica la pagina per aggiornare lo stato
+        with col_a:
+            st.subheader("Top Piatti")
+            fig = px.pie(df, names='piatto', values='prezzo', hole=0.3)
+            st.plotly_chart(fig)
+            
+        with col_b:
+            st.subheader("Incassi nel Tempo")
+            df['data'] = pd.to_datetime(df['data'])
+            df_daily = df.resample('D', on='data').sum()
+            st.line_chart(df_daily['prezzo'])
+            
+        st.subheader("Storico Transazioni")
+        st.dataframe(df.sort_values(by='data', ascending=False), use_container_width=True)
     else:
-        st.info("Il tavolo selezionato è vuoto.")
+        st.warning("Ancora nessuna vendita registrata.")
