@@ -5,7 +5,8 @@ from datetime import datetime
 from fpdf import FPDF
 
 # --- 1. CONFIGURAZIONE DATABASE ---
-conn = sqlite3.connect('ristopro_v8.db', check_same_thread=False)
+# Il file .db salva fisicamente i tuoi dati su disco/cloud
+conn = sqlite3.connect('ristopro_v9.db', check_same_thread=False)
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS vendite 
              (id INTEGER PRIMARY KEY AUTOINCREMENT, tavolo TEXT, piatti TEXT, totale REAL, data TEXT)''')
@@ -26,162 +27,137 @@ def crea_pdf(tavolo, piatti, totale):
     pdf.ln(10)
     for p in piatti:
         nome = p['nome'].replace('à','a').replace('è','e').replace('é','e').replace('ì','i').replace('ò','o').replace('ù','u')
-        qta_testo = f"x{p['qta']}"
-        pdf.cell(150, 10, txt=f"{nome} {qta_testo}", border=1)
+        pdf.cell(150, 10, txt=f"{nome} x{p['qta']}", border=1)
         pdf.cell(40, 10, txt=f"{p['prezzo']} Euro", border=1, ln=True)
     pdf.ln(10)
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(200, 10, txt=f"TOTALE: {totale} Euro", ln=True)
     return pdf.output(dest='S').encode('latin-1', errors='replace')
 
-# --- 3. INIZIALIZZAZIONE SESSIONE ---
+# --- 3. INIZIALIZZAZIONE ---
 if 'autenticato' not in st.session_state:
     st.session_state.autenticato = False
 if 'tavoli' not in st.session_state:
     st.session_state.tavoli = {f"Tavolo {i}": [] for i in range(1, 11)}
 
-# --- 4. LOGICA DI ACCESSO ---
+# --- 4. LOGIN ---
 if not st.session_state.autenticato:
-    st.title("🔐 RistoPro v8.0 - Accesso")
+    st.title("🔐 RistoPro v9.0 - Login")
     pwd = st.text_input("Password", type="password")
     if st.button("Entra"):
         if pwd == "admin123":
             st.session_state.autenticato = True
             st.rerun()
-        else:
-            st.error("Password errata")
 else:
-    st.sidebar.title("🍽️ RistoPro v8.0")
-    app_mode = st.sidebar.radio("Naviga:", ["Gestione Sala", "Gestione Menu", "Magazzino", "Dashboard Incassi"])
+    st.sidebar.title("🍽️ Gestionale Pro")
+    app_mode = st.sidebar.radio("Menu:", ["Gestione Sala", "Gestione Menu", "Magazzino", "Dashboard Incassi"])
 
-    # --- SEZIONE GESTIONE MENU ---
+    # --- SEZIONE MENU ---
     if app_mode == "Gestione Menu":
-        st.header("📋 Editor del Menu")
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            with st.form("add_menu_form", clear_on_submit=True):
-                n_nome = st.text_input("Nome Piatto/Bevanda")
-                n_cat = st.selectbox("Categoria", ["Primi", "Secondi", "Drink", "Dessert", "Altro"])
-                n_prezzo = st.number_input("Prezzo Unitario (€)", min_value=0.0, step=0.1)
-                if st.form_submit_button("Salva nel Menu"):
-                    c.execute("INSERT OR REPLACE INTO menu (nome, categoria, prezzo) VALUES (?, ?, ?)", (n_nome, n_cat, n_prezzo))
-                    conn.commit()
-                    st.success("Salvato!")
-        with col_m2:
-            df_m = pd.read_sql_query("SELECT * FROM menu", conn)
-            st.dataframe(df_m, use_container_width=True)
-
-    # --- SEZIONE GESTIONE SALA ---
-    elif app_mode == "Gestione Sala":
-        st.header("📍 Gestione Ordini")
-        df_menu_db = pd.read_sql_query("SELECT * FROM menu", conn)
+        st.header("📋 Imposta il tuo Menu")
+        with st.form("menu_form"):
+            n = st.text_input("Nome Prodotto")
+            c_cat = st.selectbox("Categoria", ["Drink", "Primi", "Secondi", "Pizze", "Altro"])
+            p = st.number_input("Prezzo (€)", min_value=0.0, step=0.1)
+            if st.form_submit_button("Salva nel Menu"):
+                c.execute("INSERT OR REPLACE INTO menu VALUES (?, ?, ?)", (n, c_cat, p))
+                conn.commit()
+                st.success("Prodotto salvato!")
         
-        if df_menu_db.empty:
-            st.warning("Aggiungi prodotti nel Menu prima di ordinare!")
-        else:
-            col_ord, col_conto = st.columns(2)
-            
-            with col_ord:
-                st.subheader("📝 Nuovo Ordine")
-                t_sel = st.selectbox("Tavolo", list(st.session_state.tavoli.keys()))
-                cat_sel = st.selectbox("Categoria", df_menu_db['categoria'].unique())
-                piatti_f = df_menu_db[df_menu_db['categoria'] == cat_sel]
-                p_sel = st.selectbox("Prodotto", piatti_f['nome'].tolist())
-                qta_sel = st.number_input("Quantità", min_value=1, value=1)
-                
-                prezzo_un = piatti_f[piatti_f['nome'] == p_sel]['prezzo'].values[0]
-                prezzo_tot_riga = prezzo_un * qta_sel
+        df_m = pd.read_sql_query("SELECT * FROM menu", conn)
+        st.dataframe(df_m, use_container_width=True)
 
-                if st.button(f"Invia {qta_sel} {p_sel} 🚀"):
+    # --- SEZIONE SALA ---
+    elif app_mode == "Gestione Sala":
+        st.header("📍 Sala e Comande")
+        df_menu_db = pd.read_sql_query("SELECT * FROM menu", conn)
+        if df_menu_db.empty:
+            st.warning("Carica prima il Menu!")
+        else:
+            t_sel = st.selectbox("Tavolo", list(st.session_state.tavoli.keys()))
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                p_sel = st.selectbox("Cosa desiderano?", df_menu_db['nome'].tolist())
+                q_sel = st.number_input("Quantità", min_value=1, value=1)
+                if st.button("Invia Ordine 🚀"):
                     c.execute("SELECT quantita FROM magazzino WHERE prodotto = ?", (p_sel,))
                     res = c.fetchone()
-                    if res and res[0] < qta_sel:
-                        st.error(f"❌ Solo {res[0]} rimasti!")
-                    else:
-                        st.session_state.tavoli[t_sel].append({"nome": p_sel, "qta": qta_sel, "prezzo": prezzo_tot_riga})
-                        if res:
-                            c.execute("UPDATE magazzino SET quantita = quantita - ? WHERE prodotto = ?", (qta_sel, p_sel))
+                    if res and res[0] >= q_sel:
+                        prezzo_un = df_menu_db[df_menu_db['nome'] == p_sel]['prezzo'].values[0]
+                        st.session_state.tavoli[t_sel].append({"nome": p_sel, "qta": q_sel, "prezzo": prezzo_un * q_sel})
+                        c.execute("UPDATE magazzino SET quantita = quantita - ? WHERE prodotto = ?", (q_sel, p_sel))
                         conn.commit()
-                        st.success("Aggiunto!")
-
-                if st.button("🗑️ Annulla Ultimo Inserimento"):
-                    if st.session_state.tavoli[t_sel]:
-                        ultimo = st.session_state.tavoli[t_sel].pop()
-                        # Ripristiniamo il magazzino
-                        c.execute("UPDATE magazzino SET quantita = quantita + ? WHERE prodotto = ?", (ultimo['qta'], ultimo['nome']))
-                        conn.commit()
-                        st.warning("Ultimo ordine rimosso e magazzino ripristinato.")
                         st.rerun()
+                    else:
+                        st.error("Scorte insufficienti in Magazzino!")
 
-            with col_conto:
-                st.subheader(f"💰 Conto {t_sel}")
+            with col2:
                 if st.session_state.tavoli[t_sel]:
                     df_t = pd.DataFrame(st.session_state.tavoli[t_sel])
                     st.table(df_t)
-                    totale = round(df_t['prezzo'].sum(), 2)
-                    st.write(f"### Totale: {totale}€")
-                    
-                    pdf_b = crea_pdf(t_sel, st.session_state.tavoli[t_sel], totale)
-                    st.download_button("🖨️ Scarica PDF", data=pdf_b, file_name=f"conto_{t_sel}.pdf")
-                    
-                    if st.button("Pagato e Chiudi"):
-                        p_nomi = ", ".join([f"{p['nome']}(x{p['qta']})" for p in st.session_state.tavoli[t_sel]])
-                        # Salviamo la data esatta e anche solo il giorno per i calcoli
-                        data_completa = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    tot = round(df_t['prezzo'].sum(), 2)
+                    st.write(f"### Totale: {tot}€")
+                    if st.button("Chiudi e Salva Incasso"):
+                        p_str = ", ".join([f"{x['nome']}x{x['qta']}" for x in st.session_state.tavoli[t_sel]])
                         c.execute("INSERT INTO vendite (tavolo, piatti, totale, data) VALUES (?,?,?,?)",
-                                  (t_sel, p_nomi, totale, data_completa))
+                                  (t_sel, p_str, tot, datetime.now().strftime("%Y-%m-%d %H:%M")))
                         conn.commit()
                         st.session_state.tavoli[t_sel] = []
-                        st.success("Tavolo liberato!")
                         st.rerun()
 
-    # --- SEZIONE MAGAZZINO ---
+    # --- SEZIONE MAGAZZINO (SALVATAGGIO PERSISTENTE) ---
     elif app_mode == "Magazzino":
-        st.header("📦 Magazzino")
-        df_mag = pd.read_sql_query("SELECT * FROM magazzino", conn)
-        st.dataframe(df_mag, use_container_width=True)
-        with st.form("m"):
-            df_m_list = pd.read_sql_query("SELECT nome FROM menu", conn)
-            p_m = st.selectbox("Prodotto", df_m_list['nome'].tolist()) if not df_m_list.empty else st.text_input("Nome")
-            q_m = st.number_input("Carica quantità", min_value=1)
-            if st.form_submit_button("Carica"):
-                c.execute("INSERT OR REPLACE INTO magazzino (prodotto, quantita) VALUES (?, COALESCE((SELECT quantita FROM magazzino WHERE prodotto = ?), 0) + ?)", (p_m, p_m, q_m))
-                conn.commit()
-                st.rerun()
-
-    # --- SEZIONE DASHBOARD (POTENZIATA) ---
-    elif app_mode == "Dashboard Incassi":
-        st.header("📊 Report Incassi Giornalieri")
-        df_v = pd.read_sql_query("SELECT * FROM vendite", conn)
+        st.header("📦 Gestione Magazzino Persistente")
         
+        # 1. Visualizzazione Scorte
+        df_mag = pd.read_sql_query("SELECT * FROM magazzino", conn)
+        st.subheader("Giacenza Attuale")
+        st.dataframe(df_mag, use_container_width=True)
+
+        st.divider()
+
+        # 2. Carico Merce
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            st.subheader("📥 Carica Merce")
+            with st.form("carico_merce"):
+                # Suggerisce i nomi dai prodotti a Menu
+                df_menu_nomi = pd.read_sql_query("SELECT nome FROM menu", conn)
+                prod_carico = st.selectbox("Scegli Prodotto", df_menu_nomi['nome'].tolist()) if not df_menu_nomi.empty else st.text_input("Nome Prodotto")
+                qta_carico = st.number_input("Quantità da aggiungere", min_value=1)
+                if st.form_submit_button("Conferma Carico"):
+                    # COALESCE gestisce il caso in cui il prodotto non sia mai stato caricato prima
+                    c.execute('''INSERT OR REPLACE INTO magazzino (prodotto, quantita) 
+                                 VALUES (?, COALESCE((SELECT quantita FROM magazzino WHERE prodotto = ?), 0) + ?)''', 
+                              (prod_carico, prod_carico, qta_carico))
+                    conn.commit()
+                    st.success(f"Caricamento di {prod_carico} salvato!")
+                    st.rerun()
+
+        with col_c2:
+            st.subheader("🔧 Rettifica Inventario")
+            with st.form("rettifica_merce"):
+                prod_mod = st.selectbox("Prodotto da modificare", df_mag['prodotto'].tolist()) if not df_mag.empty else st.text_input("Nome")
+                nuova_qta = st.number_input("Imposta Nuova Quantità Esatta", min_value=0)
+                if st.form_submit_button("Sovrascrivi Quantità"):
+                    c.execute("UPDATE magazzino SET quantita = ? WHERE prodotto = ?", (nuova_qta, prod_mod))
+                    conn.commit()
+                    st.warning(f"Quantità di {prod_mod} aggiornata a {nuova_qta}")
+                    st.rerun()
+
+    # --- SEZIONE DASHBOARD ---
+    elif app_mode == "Dashboard Incassi":
+        st.header("📊 Analisi Incassi")
+        df_v = pd.read_sql_query("SELECT * FROM vendite", conn)
         if not df_v.empty:
-            # Convertiamo la colonna data in formato datetime di pandas
             df_v['data'] = pd.to_datetime(df_v['data'])
-            # Creiamo una colonna solo per il Giorno (senza ore)
             df_v['giorno'] = df_v['data'].dt.date
-            
-            # 1. RAGGRUPPAMENTO PER GIORNO
-            incasso_giornaliero = df_v.groupby('giorno')['totale'].sum().reset_index()
-            incasso_giornaliero.columns = ['Data', 'Totale Incassato (€)']
-            
-            # KPI Veloci
-            c1, c2 = st.columns(2)
-            c1.metric("Incasso Totale Storico", f"{round(df_v['totale'].sum(), 2)} €")
-            c2.metric("Media Incasso Giornaliera", f"{round(incasso_giornaliero['Totale Incassato (€)'].mean(), 2)} €")
-            
-            # 2. GRAFICO ANDAMENTO
-            st.subheader("📈 Andamento Incassi")
-            st.line_chart(incasso_giornaliero.set_index('Data'))
-            
-            # 3. TABELLA DETTAGLIATA
-            st.subheader("📅 Riepilogo per Giorno")
-            st.table(incasso_giornaliero.sort_values(by='Data', ascending=False))
-            
-            # 4. STORICO SINGOLI ORDINI
-            with st.expander("Vedi tutti i singoli ordini"):
-                st.dataframe(df_v.sort_values(by='data', ascending=False))
+            inc_giorn = df_v.groupby('giorno')['totale'].sum()
+            st.line_chart(inc_giorn)
+            st.table(inc_giorn)
         else:
-            st.info("Nessun incasso registrato. I dati appariranno qui dopo aver chiuso il primo tavolo.")
+            st.info("Dati non ancora disponibili.")
 
     if st.sidebar.button("Logout"):
         st.session_state.autenticato = False
