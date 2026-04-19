@@ -7,126 +7,103 @@ except:
     PDF_SUPPORT = False
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="HORECA PRO - FOTO MENU", layout="wide", page_icon="🖼️")
+st.set_page_config(page_title="HORECA PRO - STAMPA TERMICA", layout="wide")
 
-# CSS PER BOTTONI CON IMMAGINI
-st.markdown("""
-    <style>
-    .stApp { background-color: #f8f9fa; }
-    .stButton>button { 
-        border-radius: 12px; 
-        height: 100px; 
-        font-weight: 700; 
-        font-size: 15px; 
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        white-space: pre-wrap; /* Permette il ritorno a capo per l'emoji */
-    }
-    .cat-header { background-color: #2c3e50; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 15px; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- FUNZIONE STAMPA TERMICA PROFESSIONALE (58mm) ---
+def genera_scontrino_termico(tavolo, ordine, totale):
+    # Formato 58mm larghezza, altezza dinamica. Margini quasi a zero.
+    pdf = FPDF(format=(58, 150)) 
+    pdf.add_page()
+    pdf.set_margins(left=2, top=2, right=2)
+    pdf.set_auto_page_break(False)
+    
+    # Intestazione (Nome Bar)
+    pdf.set_font("Courier", "B", 12)
+    pdf.cell(0, 8, "DOMENICO BAR", ln=True, align='C')
+    
+    # Info Tavolo e Data
+    pdf.set_font("Courier", "", 8)
+    pdf.cell(0, 4, f"Tavolo: {tavolo}", ln=True, align='C')
+    pdf.cell(0, 4, datetime.now().strftime("%d/%m/%Y %H:%M"), ln=True, align='C')
+    pdf.cell(0, 4, "-"*28, ln=True, align='C')
+    
+    # Lista Prodotti (Formattazione incolonnata)
+    pdf.set_font("Courier", "", 9)
+    for item in ordine:
+        # Nome prodotto max 14 lettere per non sballare la riga
+        nome = item['n'][:14]
+        prezzo = f"{item['p']:.2f}"
+        pdf.cell(38, 5, f"{nome}")
+        pdf.cell(12, 5, f"{prezzo}", ln=True, align='R')
+    
+    pdf.cell(0, 4, "-"*28, ln=True, align='C')
+    
+    # Totale in grassetto
+    pdf.set_font("Courier", "B", 12)
+    pdf.cell(0, 10, f"TOTALE: EUR {totale:.2f}", ln=True, align='R')
+    
+    # Messaggio finale
+    pdf.set_font("Courier", "I", 7)
+    pdf.cell(0, 10, "Grazie e a presto!", ln=True, align='C')
+    
+    return pdf.output(dest='S').encode('latin-1')
 
-# --- INIZIALIZZAZIONE DATI ---
+# --- LOGICA APPLICAZIONE ---
 if 'menu' not in st.session_state:
     st.session_state.menu = {
-        "☕ CAFFETTERIA": {
-            "Caffè": {"p": 1.2, "img": "☕"}, 
-            "Cappuccino": {"p": 1.8, "img": "🥛"},
-            "Cornetto": {"p": 1.5, "img": "🥐"}
-        },
-        "🍷 BEVANDE": {
-            "Acqua": {"p": 1.0, "img": "💧"}, 
-            "Birra": {"p": 3.5, "img": "🍺"},
-            "Coca Cola": {"p": 3.0, "img": "🥤"}
-        }
+        "☕ CAFFETTERIA": {"Caffè": {"p": 1.2, "img": "☕"}, "Cornetto": {"p": 1.5, "img": "🥐"}},
+        "🍷 BEVANDE": {"Acqua": {"p": 1.0, "img": "💧"}, "Birra": {"p": 3.5, "img": "🍺"}}
     }
 if 'tavoli' not in st.session_state:
     st.session_state.tavoli = {f"TAVOLO {i}": [] for i in range(1, 13)}
-if 'incasso' not in st.session_state:
-    st.session_state.incasso = 0.0
 
-# --- SEZIONE 1: SALA TAVOLI (CON GRAFICA) ---
-with st.sidebar:
-    st.title("🏨 HORECA PRO")
-    scelta = st.radio("MENU PRINCIPALE", ["🛎️ SALA TAVOLI", "⚙️ GESTIONE LISTINO", "📊 CHIUSURA CASSA"])
+# --- INTERFACCIA ---
+st.title("🏨 HORECA POS - STAMPA")
+
+# Selezione Tavoli
+t_cols = st.columns(4)
+for i, (t_nome, items) in enumerate(st.session_state.tavoli.items()):
+    if t_cols[i%4].button(f"{t_nome}\n€{sum(x['p'] for x in items):.2f}" if items else f"{t_nome}\nLIBERO", key=t_nome):
+        st.session_state.t_attivo = t_nome
+
+if 't_attivo' in st.session_state:
+    t_sel = st.session_state.t_attivo
     st.divider()
-    st.metric("INCASSO OGGI", f"€ {st.session_state.incasso:.2f}")
+    c_menu, c_conto = st.columns([2, 1])
 
-if scelta == "🛎️ SALA TAVOLI":
-    st.subheader("📍 Selezione Tavolo")
-    t_cols = st.columns(4)
-    for i, (t_nome, items) in enumerate(st.session_state.tavoli.items()):
-        label = f"{t_nome}\n€{sum(x['p'] for x in items):.2f}" if items else f"{t_nome}\n(LIBERO)"
-        if t_cols[i%4].button(label, key=t_nome, type="primary" if items else "secondary"):
-            st.session_state.t_attivo = t_nome
+    with c_menu:
+        st.subheader(f"Menu {t_sel}")
+        tabs = st.tabs(list(st.session_state.menu.keys()))
+        for i, cat in enumerate(st.session_state.menu.keys()):
+            with tabs[i]:
+                m_cols = st.columns(3)
+                for j, (prod, dati) in enumerate(st.session_state.menu[cat].items()):
+                    if m_cols[j%3].button(f"{dati['img']}\n{prod}", key=f"add_{cat}_{prod}"):
+                        st.session_state.tavoli[t_sel].append({"n": prod, "p": dati['p']})
+                        st.rerun()
 
-    if 't_attivo' in st.session_state:
-        t_sel = st.session_state.t_attivo
-        st.divider()
-        c_menu, c_conto = st.columns([2, 1])
-
-        with c_menu:
-            st.markdown(f"<div class='cat-header'>SELEZIONE VISIVA - {t_sel}</div>", unsafe_allow_html=True)
-            tabs = st.tabs(list(st.session_state.menu.keys()))
-            for i, cat in enumerate(st.session_state.menu.keys()):
-                with tabs[i]:
-                    m_cols = st.columns(3)
-                    for j, (prod, dati) in enumerate(st.session_state.menu[cat].items()):
-                        # Mostriamo Emoji + Nome + Prezzo sul bottone
-                        testo_bottone = f"{dati['img']}\n{prod}\n€{dati['p']:.2f}"
-                        if m_cols[j%3].button(testo_bottone, key=f"add_{cat}_{prod}"):
-                            st.session_state.tavoli[t_sel].append({"n": prod, "p": dati['p']})
-                            st.rerun()
-
-        with c_conto:
-            st.markdown(f"<div class='cat-header' style='background-color:#e67e22;'>CONTO {t_sel}</div>", unsafe_allow_html=True)
-            ordine = st.session_state.tavoli[t_sel]
-            tot = sum(x['p'] for x in ordine)
-            for idx, item in enumerate(ordine):
-                c_n, c_p, c_d = st.columns([3, 2, 1])
-                c_n.write(item['n'])
-                c_p.write(f"€{item['p']:.2f}")
-                if c_d.button("X", key=f"del_{idx}"):
-                    st.session_state.tavoli[t_sel].pop(idx)
-                    st.rerun()
-            st.divider()
-            st.markdown(f"## TOTALE: €{tot:.2f}")
-            if tot > 0:
-                if st.button("✅ CHIUDI E INCASSA", type="primary", use_container_width=True):
-                    st.session_state.incasso += tot
-                    st.session_state.tavoli[t_sel] = []
-                    st.success("Tavolo chiuso!")
-                    st.rerun()
-
-# --- SEZIONE 2: GESTIONE LISTINO (CON AGGIUNTA FOTO/EMOJI) ---
-elif scelta == "⚙️ GESTIONE LISTINO":
-    st.header("⚙️ Configura Prodotti con Icone")
-    
-    col_a, col_b, col_c, col_d = st.columns(4)
-    categoria = col_a.selectbox("Categoria", list(st.session_state.menu.keys()) + ["NUOVA CATEGORIA"])
-    if categoria == "NUOVA CATEGORIA":
-        categoria = col_a.text_input("Nome Categoria").upper()
-    
-    nome = col_b.text_input("Nome Prodotto")
-    prezzo = col_c.number_input("Prezzo (€)", min_value=0.0, step=0.10)
-    icona = col_d.text_input("Icona/Emoji (es: 🍹, 🍕, 🍔)")
-    
-    if st.button("SALVA NEL LISTINO"):
-        if categoria not in st.session_state.menu:
-            st.session_state.menu[categoria] = {}
-        st.session_state.menu[categoria][nome] = {"p": prezzo, "img": icona if icona else "📦"}
-        st.success("Prodotto aggiunto con successo!")
-        st.rerun()
-
-    st.divider()
-    for cat, prods in st.session_state.menu.items():
-        with st.expander(f"LISTINO {cat}"):
-            for p, dati in prods.items():
-                st.write(f"{dati['img']} {p}: €{dati['p']:.2f}")
-
-# --- SEZIONE 3: CHIUSURA ---
-elif scelta == "📊 CHIUSURA CASSA":
-    st.header("📊 Resoconto")
-    st.metric("INCASSO TOTALE", f"€ {st.session_state.incasso:.2f}")
-    if st.button("🔴 RESET GIORNATA"):
-        st.session_state.incasso = 0.0
-        st.rerun()
+    with c_conto:
+        st.subheader("Conto")
+        ordine = st.session_state.tavoli[t_sel]
+        tot = sum(x['p'] for x in ordine)
+        for item in ordine:
+            st.write(f"{item['n']} - €{item['p']:.2f}")
+        
+        if tot > 0:
+            st.markdown(f"### TOTALE: €{tot:.2f}")
+            
+            # --- TASTO STAMPA ---
+            if PDF_SUPPORT:
+                pdf_bytes = genera_scontrino_termico(t_sel, ordine, tot)
+                st.download_button(
+                    label="🖨️ STAMPA SCONTRINO",
+                    data=pdf_bytes,
+                    file_name=f"scontrino_{t_sel}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            
+            if st.button("✅ CHIUDI TAVOLO", type="primary", use_container_width=True):
+                st.session_state.tavoli[t_sel] = []
+                st.success("Incassato!")
+                st.rerun()
